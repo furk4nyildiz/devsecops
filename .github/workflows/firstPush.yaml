@@ -48,7 +48,7 @@ jobs:
       - name: PHP-CS-Fixer kontrolü
         if: hashFiles('**/*.php') != ''
         continue-on-error: true
-        uses: oskarstark/php-cs-fixer-ga@v3
+        uses: docker://oskarstark/php-cs-fixer-ga:latest
         with:
           args: --dry-run --diff --verbose
 
@@ -85,7 +85,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: detect --source . --no-banner || echo "Gitleaks olası gizli anahtar tespit etti."
+          args: detect --source . --no-banner
 
       - name: Pipeline özeti
         run: |
