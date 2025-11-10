@@ -1,0 +1,78 @@
+name: Issue Branch DevSecOps Checks
+
+on:
+  push:
+    branches-ignore:
+      - 'master'
+      - 'main'
+      - 'test'
+
+permissions:
+  contents: read
+
+jobs:
+  devsecops_checks:
+    name: Lint, Test, SAST, Secret Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodun çekilmesi
+        uses: actions/checkout@v4
+
+      - name: Node.js ortamının hazırlanması
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Bağımlılıkların yüklenmesi
+        if: hashFiles('package.json') != ''
+        continue-on-error: true
+        run: |
+          npm ci || npm install
+
+      # Lint kontrolleri
+      - name: Lint scripti çalıştırılması
+        if: hashFiles('package.json') != ''
+        continue-on-error: true
+        run: |
+          npm run lint --if-present || echo "Lint sırasında uyarılar/hatalar bulundu."
+
+      - name: Prettier format kontrolü
+        if: hashFiles('package.json') != ''
+        continue-on-error: true
+        run: |
+          npx prettier --check . || echo "Prettier format farkları bulundu."
+
+      # Unit / integration testler
+      - name: Testlerin çalıştırılması
+        if: hashFiles('package.json') != ''
+        continue-on-error: true
+        run: |
+          npm test --if-present || echo "Testler sırasında hata/başarısızlıklar bulundu."
+
+      # Hafif SAST - Semgrep
+      - name: Semgrep kurulumu
+        continue-on-error: true
+        run: |
+          python -m pip install --upgrade pip
+          pip install semgrep
+
+      - name: Semgrep taraması
+        continue-on-error: true
+        run: |
+          semgrep --config p/ci || echo "Semgrep bazı güvenlik uyarıları buldu."
+
+      # Secret taraması - Gitleaks
+      - name: Gitleaks taraması
+        continue-on-error: true
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: detect --source . --no-banner
+
+      - name: Pipeline özeti
+        run: |
+          echo "Juice Shop için DevSecOps kontrolleri tamamlandı."
+          echo "Herhangi bir bulgu varsa ilgili adımın loglarında detayları görebilirsiniz."
