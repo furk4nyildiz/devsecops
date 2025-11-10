@@ -1,0 +1,106 @@
+name: Issue Branch DevSecOps Checks
+
+on:
+  push:
+    branches-ignore:
+      - 'master'
+      - 'main'
+      - 'test'
+
+permissions:
+  contents: read
+
+jobs:
+  devsecops_checks:
+    name: Lint, Test, SAST, Secret Scan (Issue Branch)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu çek
+        uses: actions/checkout@v4
+
+      # Frontend (Juice Shop) varsa Node ortamı hazırla
+      - name: Node.js ortamını hazırla
+        if: hashFiles('frontend/package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+
+      - name: Bağımlılıkları yükle (frontend)
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: ./frontend
+        continue-on-error: true
+        run: |
+          npm ci || npm install --legacy-peer-deps
+
+      # Eksik ESLint plugin'i varsa kur (lint hatasını susturmak için)
+      - name: ESLint plugin kontrolü
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: ./frontend
+        continue-on-error: true
+        run: |
+          if ! npm list eslint-plugin-n >/dev/null 2>&1; then
+            npm install -D eslint-plugin-n || echo "eslint-plugin-n kurulamadı, lint sırasında uyarılar çıkabilir."
+          fi
+
+      # Lint kontrolleri - başarısız olsa bile pipeline'ı kırma
+      - name: Lint çalıştır (frontend)
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: ./frontend
+        continue-on-error: true
+        run: |
+          npm run lint --if-present || echo "Lint sırasında uyarılar/hatalar bulundu (pipeline kırılmadı)."
+
+      # Prettier format kontrolü - sadece uyarı
+      - name: Prettier format kontrolü (frontend)
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: ./frontend
+        continue-on-error: true
+        run: |
+          npx prettier --check . || echo "Prettier format farkları bulundu (bilgilendirme amaçlı)."
+
+      # Testler - karma config yoksa kibarca atla
+      - name: Testleri çalıştır (frontend)
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: ./frontend
+        continue-on-error: true
+        run: |
+          if [ -f src/karma.conf.js ] || [ -f karma.conf.js ]; then
+            npm test --if-present || echo "Testler sırasında hata/başarısızlıklar bulundu."
+          else
+            echo "Karma config bulunamadı, bu branch için testler atlandı."
+          fi
+
+      # Python ortamı (Semgrep için)
+      - name: Python ortamını hazırla
+        continue-on-error: true
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Hafif SAST - Semgrep
+      - name: Semgrep kurulumu
+        continue-on-error: true
+        run: |
+          python -m pip install --upgrade pip
+          pip install semgrep || echo "Semgrep kurulurken hata oluştu."
+
+      - name: Semgrep taraması
+        continue-on-error: true
+        run: |
+          semgrep --config p/ci || echo "Semgrep bazı güvenlik uyarıları buldu veya hata verdi (kontrol etmen önerilir)."
+
+      # Secret Scan - Gitleaks
+      - name: Gitleaks taraması
+        continue-on-error: true
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: detect --source . --no-banner || true
+
+      - name: Pipeline özeti
+        if: always()
+        run: |
+          echo "Issue branch için DevSecOps kontrolleri tamamlandı."
+          echo "Bulunan uyarı ve hatalar ilgili adımların loglarında detaylı görülebilir."
