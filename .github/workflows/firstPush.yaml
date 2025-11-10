@@ -4,15 +4,15 @@ on:
   push:
     branches-ignore:
       - 'master'
-      - 'test'
       - 'main'
+      - 'test'
 
 permissions:
   contents: read
 
 jobs:
   devsecops_checks:
-    name: Lint, Unit Test, Light SAST, Secret Scan
+    name: Lint, Test, SAST, Secret Scan
     runs-on: ubuntu-latest
 
     steps:
@@ -24,20 +24,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
 
-      - name: Python ortamının hazırlanması
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      # Lint ve format kontrolleri
-      - name: ESLint kontrolü
-        if: hashFiles('package.json') != '' && hashFiles('.eslintrc*') != ''
+      - name: Bağımlılıkların yüklenmesi
+        if: hashFiles('package.json') != ''
         continue-on-error: true
         run: |
-          npm ci || true
-          npx eslint . || echo "ESLint uyarıları bulundu."
+          npm ci || npm install
+
+      # Lint kontrolleri
+      - name: Lint scripti çalıştırılması
+        if: hashFiles('package.json') != ''
+        continue-on-error: true
+        run: |
+          npm run lint --if-present || echo "Lint sırasında uyarılar/hatalar bulundu."
 
       - name: Prettier format kontrolü
         if: hashFiles('package.json') != ''
@@ -45,28 +44,14 @@ jobs:
         run: |
           npx prettier --check . || echo "Prettier format farkları bulundu."
 
-      - name: PHP-CS-Fixer kontrolü
-        if: hashFiles('**/*.php') != ''
-        continue-on-error: true
-        uses: docker://oskarstark/php-cs-fixer-ga:latest
-        with:
-          args: --dry-run --diff --verbose
-
-      # Unit testler
-      - name: JavaScript/TypeScript unit testleri
+      # Unit / integration testler
+      - name: Testlerin çalıştırılması
         if: hashFiles('package.json') != ''
         continue-on-error: true
         run: |
-          npm test --if-present || echo "Unit testlerde hata var."
+          npm test --if-present || echo "Testler sırasında hata/başarısızlıklar bulundu."
 
-      - name: PHP unit testleri
-        if: hashFiles('composer.json') != ''
-        continue-on-error: true
-        run: |
-          composer install --no-interaction --no-progress || true
-          vendor/bin/phpunit || echo "PHP unit test hataları bulundu."
-
-      # Hafif SAST taraması
+      # Hafif SAST - Semgrep
       - name: Semgrep kurulumu
         continue-on-error: true
         run: |
@@ -78,7 +63,7 @@ jobs:
         run: |
           semgrep --config p/ci || echo "Semgrep bazı güvenlik uyarıları buldu."
 
-      # Secret taraması
+      # Secret taraması - Gitleaks
       - name: Gitleaks taraması
         continue-on-error: true
         uses: gitleaks/gitleaks-action@v2
@@ -89,5 +74,5 @@ jobs:
 
       - name: Pipeline özeti
         run: |
-          echo "Kontroller tamamlandı."
-          echo "Uyarılar varsa loglarda görüntülenebilir. Pipeline durdurulmadı."
+          echo "Juice Shop için DevSecOps kontrolleri tamamlandı."
+          echo "Herhangi bir bulgu varsa ilgili adımın loglarında detayları görebilirsiniz."
