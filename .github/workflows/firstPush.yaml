@@ -1,0 +1,93 @@
+name: Issue Branch DevSecOps Checks
+
+on:
+  push:
+    branches-ignore:
+      - 'master'
+      - 'test'
+      - 'main'
+
+permissions:
+  contents: read
+
+jobs:
+  devsecops_checks:
+    name: Lint, Unit Test, Light SAST, Secret Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodun çekilmesi
+        uses: actions/checkout@v4
+
+      - name: Node.js ortamının hazırlanması
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Python ortamının hazırlanması
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Lint ve format kontrolleri
+      - name: ESLint kontrolü
+        if: hashFiles('package.json') != '' && hashFiles('.eslintrc*') != ''
+        continue-on-error: true
+        run: |
+          npm ci || true
+          npx eslint . || echo "ESLint uyarıları bulundu."
+
+      - name: Prettier format kontrolü
+        if: hashFiles('package.json') != ''
+        continue-on-error: true
+        run: |
+          npx prettier --check . || echo "Prettier format farkları bulundu."
+
+      - name: PHP-CS-Fixer kontrolü
+        if: hashFiles('**/*.php') != ''
+        continue-on-error: true
+        uses: oskarstark/php-cs-fixer-ga@v3
+        with:
+          args: --dry-run --diff --verbose
+
+      # Unit testler
+      - name: JavaScript/TypeScript unit testleri
+        if: hashFiles('package.json') != ''
+        continue-on-error: true
+        run: |
+          npm test --if-present || echo "Unit testlerde hata var."
+
+      - name: PHP unit testleri
+        if: hashFiles('composer.json') != ''
+        continue-on-error: true
+        run: |
+          composer install --no-interaction --no-progress || true
+          vendor/bin/phpunit || echo "PHP unit test hataları bulundu."
+
+      # Hafif SAST taraması
+      - name: Semgrep kurulumu
+        continue-on-error: true
+        run: |
+          python -m pip install --upgrade pip
+          pip install semgrep
+
+      - name: Semgrep taraması
+        continue-on-error: true
+        run: |
+          semgrep --config p/ci || echo "Semgrep bazı güvenlik uyarıları buldu."
+
+      # Secret taraması
+      - name: Gitleaks taraması
+        continue-on-error: true
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: detect --source . --no-banner || echo "Gitleaks olası gizli anahtar tespit etti."
+
+      - name: Pipeline özeti
+        run: |
+          echo "Kontroller tamamlandı."
+          echo "Uyarılar varsa loglarda görüntülenebilir. Pipeline durdurulmadı."
