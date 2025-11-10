@@ -24,15 +24,20 @@ jobs:
           git config user.name "furk4nyildiz"
           git config user.email "fmyildiz41@gmail.com"
 
-      - name: Master değişikliklerinin test branch'ine merge edilmesi
+      - name: Test branch'ine geçiş ve master merge
         run: |
           git fetch origin
 
-          # Test branch'ine geç
-          git checkout test
+          # Eğer 'test' adında klasör veya dosya varsa kaldır
+          if [ -d "test" ] || [ -f "test" ]; then
+            rm -rf test
+          fi
 
-          # Master'ı test'e merge et
-          git merge --no-ff origin/master -m "master değişikliklerinin test branch'ine aktarılması"
+          # test branch'ine geç
+          git checkout -B test origin/test
 
-          # Sonuçları remote test branch'ine gönder
+          # master'dan gelen değişiklikleri birleştir
+          git merge --no-ff origin/master -m "master değişiklikleri test branch'ine aktarıldı"
+
+          # sonucu remote test branch'ine gönder
           git push origin test
