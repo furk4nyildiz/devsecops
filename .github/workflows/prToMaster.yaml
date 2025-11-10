@@ -31,7 +31,7 @@ jobs:
         run: |
           npm ci || npm install --legacy-peer-deps
 
-      # Lint - eslint-plugin-n yoksa düşürme, sadece info ver
+      # Lint - eslint-plugin-n yoksa düşürme, sadece bilgi ver
       - name: Lint çalıştır
         if: hashFiles('frontend/package.json') != ''
         working-directory: ./frontend
@@ -42,12 +42,14 @@ jobs:
             echo "Bilgi: eslint-plugin-n veya ilgili ESLint konfigürasyonu eksik, lint bu PR için atlandı."
           fi
 
-      # Prettier - sadece uyarı, pipeline'ı kırmasın (Juice Shop format farkları için)
+      # Prettier - sadece uyarı, kesinlikle pipeline'ı kırmasın
       - name: Prettier format kontrolü
         if: hashFiles('frontend/package.json') != ''
         working-directory: ./frontend
         run: |
-          npx prettier --check . || echo "Bilgi: Prettier format farkları bulundu, istersen 'npx prettier --write' ile düzeltebilirsin."
+          if ! npx prettier --check .; then
+            echo "Bilgi: Prettier format farkları bulundu. İstersen 'npx prettier --write' ile düzeltebilirsin."
+          fi
 
       # Testler - karma config yoksa atla
       - name: Testleri çalıştır
@@ -87,5 +89,5 @@ jobs:
         if: always()
         run: |
           echo "PR → master için DevSecOps kontrolleri tamamlandı."
-          echo "Semgrep veya Gitleaks adımlarındaki hatalar, PR'ın bloklanması için geçerlidir."
-          echo "Lint / Prettier / Test adımları şu an bilgilendirme amaçlıdır."
+          echo "Semgrep veya Gitleaks adımlarındaki hatalar PR'ın bloklanması için geçerlidir."
+          echo "Lint / Prettier / Test adımları şu an bilgilendirme amaçlı çalışmaktadır."
