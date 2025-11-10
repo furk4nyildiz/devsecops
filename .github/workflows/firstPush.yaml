@@ -26,7 +26,7 @@ jobs:
         with:
           node-version: '22.12.0'
           cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+          # cache-dependency-path kaldırıldı; yanlış path adımı düşürmesin diye.
 
       - name: Bağımlılıkları yükle (frontend)
         if: hashFiles('frontend/package.json') != ''
@@ -35,7 +35,6 @@ jobs:
         run: |
           npm ci || npm install --legacy-peer-deps
 
-      # Lint kontrolleri
       - name: Lint çalıştır (frontend)
         if: hashFiles('frontend/package.json') != ''
         working-directory: ./frontend
@@ -43,7 +42,6 @@ jobs:
         run: |
           npm run lint --if-present || echo "Lint sırasında uyarılar/hatalar bulundu."
 
-      # Prettier format kontrolü
       - name: Prettier format kontrolü (frontend)
         if: hashFiles('frontend/package.json') != ''
         working-directory: ./frontend
@@ -51,7 +49,6 @@ jobs:
         run: |
           npx prettier --check . || echo "Prettier format farkları bulundu."
 
-      # Testler
       - name: Testleri çalıştır (frontend)
         if: hashFiles('frontend/package.json') != ''
         working-directory: ./frontend
@@ -59,14 +56,12 @@ jobs:
         run: |
           npm test --if-present || echo "Testler sırasında hata/başarısızlıklar bulundu."
 
-      # Python ortamı (Semgrep için)
       - name: Python ortamını hazırla
         continue-on-error: true
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # Hafif SAST - Semgrep
       - name: Semgrep kurulumu
         continue-on-error: true
         run: |
@@ -78,7 +73,6 @@ jobs:
         run: |
           semgrep --config p/ci || echo "Semgrep bazı güvenlik uyarıları buldu veya hata verdi."
 
-      # Secret Scan - Gitleaks
       - name: Gitleaks taraması
         continue-on-error: true
         uses: gitleaks/gitleaks-action@v2
@@ -90,5 +84,5 @@ jobs:
       - name: Pipeline özeti
         if: always()
         run: |
-          echo "Issue branch push için DevSecOps kontrolleri çalıştırıldı."
+          echo "Issue branch için DevSecOps kontrolleri çalıştırıldı."
           echo "Bulunan uyarı ve hatalar ilgili adımların loglarında görülebilir."
