@@ -18,35 +18,48 @@ jobs:
       - name: Kodu çek
         uses: actions/checkout@v4
 
+      # Node.js sadece frontend yapısı varsa kuruluyor
       - name: Node.js ortamını hazırla
-        if: hashFiles('package.json') != ''
+        if: hashFiles('frontend/package.json') != ''
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22.12.0'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
 
-      - name: Bağımlılıkları yükle
-        if: hashFiles('package.json') != ''
+      - name: Frontend bağımlılıklarını yükle
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: ./frontend
         run: |
-          npm ci || npm install
+          npm ci || npm install --legacy-peer-deps
 
-      # Kod kalitesi
+      # Kod kalitesi - Lint
       - name: Lint çalıştır
-        if: hashFiles('package.json') != ''
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: ./frontend
         run: |
           npm run lint --if-present
 
+      # Kod formatı - Prettier
       - name: Prettier format kontrolü
-        if: hashFiles('package.json') != ''
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: ./frontend
         run: |
           npx prettier --check .
 
       # Testler
       - name: Testleri çalıştır
-        if: hashFiles('package.json') != ''
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: ./frontend
         run: |
           npm test --if-present
 
-      # SAST - Semgrep (gate olarak, bulgu varsa pipeline fail)
+      # SAST - Semgrep (gate, hata bulursa job fail)
+      - name: Python ortamını hazırla
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Semgrep kur
         run: |
           python -m pip install --upgrade pip
@@ -68,4 +81,4 @@ jobs:
         if: always()
         run: |
           echo "PR → master için DevSecOps kontrolleri tamamlandı."
-          echo "Herhangi bir adımın başarısız olması, PR'ın incelenmesi gerektiği anlamına gelir."
+          echo "Herhangi bir adımın başarısız olması, PR'ın detaylı incelenmesi gerektiği anlamına gelir."

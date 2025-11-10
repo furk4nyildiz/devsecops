@@ -12,67 +12,83 @@ permissions:
 
 jobs:
   devsecops_checks:
-    name: Lint, Test, SAST, Secret Scan
+    name: Lint, Test, SAST, Secret Scan (Issue Branch)
     runs-on: ubuntu-latest
 
     steps:
-      - name: Kodun çekilmesi
+      - name: Kodu çek
         uses: actions/checkout@v4
 
-      - name: Node.js ortamının hazırlanması
-        if: hashFiles('package.json') != ''
+      # Frontend varsa Node ortamı hazırla (Juice Shop için)
+      - name: Node.js ortamını hazırla
+        if: hashFiles('frontend/package.json') != ''
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22.12.0'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
 
-      - name: Bağımlılıkların yüklenmesi
-        if: hashFiles('package.json') != ''
+      - name: Bağımlılıkları yükle (frontend)
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: ./frontend
         continue-on-error: true
         run: |
-          npm ci || npm install
+          npm ci || npm install --legacy-peer-deps
 
       # Lint kontrolleri
-      - name: Lint scripti çalıştırılması
-        if: hashFiles('package.json') != ''
+      - name: Lint çalıştır (frontend)
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: ./frontend
         continue-on-error: true
         run: |
           npm run lint --if-present || echo "Lint sırasında uyarılar/hatalar bulundu."
 
-      - name: Prettier format kontrolü
-        if: hashFiles('package.json') != ''
+      # Prettier format kontrolü
+      - name: Prettier format kontrolü (frontend)
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: ./frontend
         continue-on-error: true
         run: |
           npx prettier --check . || echo "Prettier format farkları bulundu."
 
-      # Unit / integration testler
-      - name: Testlerin çalıştırılması
-        if: hashFiles('package.json') != ''
+      # Testler
+      - name: Testleri çalıştır (frontend)
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: ./frontend
         continue-on-error: true
         run: |
           npm test --if-present || echo "Testler sırasında hata/başarısızlıklar bulundu."
+
+      # Python ortamı (Semgrep için)
+      - name: Python ortamını hazırla
+        continue-on-error: true
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       # Hafif SAST - Semgrep
       - name: Semgrep kurulumu
         continue-on-error: true
         run: |
           python -m pip install --upgrade pip
-          pip install semgrep
+          pip install semgrep || echo "Semgrep kurulurken hata oluştu."
 
       - name: Semgrep taraması
         continue-on-error: true
         run: |
-          semgrep --config p/ci || echo "Semgrep bazı güvenlik uyarıları buldu."
+          semgrep --config p/ci || echo "Semgrep bazı güvenlik uyarıları buldu veya hata verdi."
 
-      # Secret taraması - Gitleaks
+      # Secret Scan - Gitleaks
       - name: Gitleaks taraması
         continue-on-error: true
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: detect --source . --no-banner
+          args: detect --source . --no-banner || true
 
       - name: Pipeline özeti
+        if: always()
         run: |
-          echo "Juice Shop için DevSecOps kontrolleri tamamlandı."
-          echo "Herhangi bir bulgu varsa ilgili adımın loglarında detayları görebilirsiniz."
+          echo "Issue branch push için DevSecOps kontrolleri çalıştırıldı."
+          echo "Bulunan uyarı ve hatalar ilgili adımların loglarında görülebilir."
