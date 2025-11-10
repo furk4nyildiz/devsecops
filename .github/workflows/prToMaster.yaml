@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Kodu çek
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Gitleaks'in ihtiyaç duyduğu commit geçmişi için önemli
 
       # Sadece frontend varsa Node ortamı hazırla
       - name: Node.js ortamını hazırla
@@ -42,7 +44,7 @@ jobs:
             echo "Bilgi: eslint-plugin-n veya ilgili ESLint konfigürasyonu eksik, lint bu PR için atlandı."
           fi
 
-      # Prettier - sadece uyarı, kesinlikle pipeline'ı kırmasın
+      # Prettier - sadece uyarı, pipeline'ı kırmasın
       - name: Prettier format kontrolü
         if: hashFiles('frontend/package.json') != ''
         working-directory: ./frontend
@@ -90,4 +92,4 @@ jobs:
         run: |
           echo "PR → master için DevSecOps kontrolleri tamamlandı."
           echo "Semgrep veya Gitleaks adımlarındaki hatalar PR'ın bloklanması için geçerlidir."
-          echo "Lint / Prettier / Test adımları şu an bilgilendirme amaçlı çalışmaktadır."
+          echo "Lint / Prettier / Test adımları şu an bilgilendirme amaçlıdır."
