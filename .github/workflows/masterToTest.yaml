@@ -1,0 +1,26 @@
+name: Master to Test Promotion
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  promote_master_to_test:
+    name: Master branch'in Test ortamına aktarılması
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Depo bilgisinin alınması
+        uses: actions/checkout@v4
+
+      - name: Master'dan Test branch'ine merge
+        uses: peter-evans/merge-branch@v4
+        with:
+          head: master
+          base: test
+          commit_message: "chore: master degisiklikleri test branch'ine aktarıldı"
