@@ -1,0 +1,76 @@
+name: Test to Main Promotion with Local DAST
+
+on:
+  push:
+    branches:
+      - test
+
+permissions:
+  contents: write
+
+jobs:
+  dast_and_promote:
+    name: DAST taraması ve main branch'ine aktarılması
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Depoyu indirme
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Git kullanıcı bilgisinin ayarlanması
+        run: |
+          git config user.name "furk4nyildiz"
+          git config user.email "fmyildiz41@gmail.com"
+
+      - name: Docker imajının oluşturulması
+        run: |
+          docker build -t app-under-test .
+
+      - name: Uygulamanın container olarak başlatılması
+        run: |
+          docker run -d --rm --name app-under-test -p 3000:3000 app-under-test
+
+      - name: Uygulamanın hazır hale gelmesinin beklenmesi
+        run: |
+          for i in {1..30}; do
+            if curl -sSf http://localhost:3000 > /dev/null; then
+              echo "Uygulama ayakta."
+              exit 0
+            fi
+            echo "Uygulama henüz hazır değil, tekrar denenecek..."
+            sleep 5
+          done
+          echo "Uygulama zamanında ayağa kalkmadı."
+          exit 1
+
+      - name: OWASP ZAP Baseline DAST taraması
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: 'http://localhost:3000'
+          fail_action: true
+          cmd_options: '-a'
+
+      - name: DAST sonrası container'ın durdurulması
+        if: always()
+        run: |
+          docker stop app-under-test || true
+
+      - name: Test değişikliklerinin main branch'ine merge edilmesi
+        if: success()
+        run: |
+          git fetch origin
+
+          if [ -d "main" ] || [ -f "main" ]; then
+            rm -rf main
+          fi
+
+          if git show-ref --quiet refs/remotes/origin/main; then
+            git checkout -B main origin/main
+          else
+            git checkout -B main
+          fi
+
+          git merge --no-ff origin/test -m "DAST sonrası test branch değişiklikleri main branch'ine aktarıldı"
+          git push origin main
