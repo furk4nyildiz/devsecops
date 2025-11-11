@@ -1,0 +1,43 @@
+name: Master to Test Promotion
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  promote_master_to_test:
+    name: Master branch'in test branch'ine aktarılması
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Depoyu indirme
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Git kullanıcı bilgisinin ayarlanması
+        run: |
+          git config user.name "furk4nyildiz"
+          git config user.email "fmyildiz41@gmail.com"
+
+      - name: Test branch'ine geçiş ve master merge
+        run: |
+          git fetch origin
+
+          # Eğer 'test' adında klasör veya dosya varsa kaldır
+          if [ -d "test" ] || [ -f "test" ]; then
+            rm -rf test
+          fi
+
+          # test branch'ine geç
+          git checkout -B test origin/test
+
+          # master'dan gelen değişiklikleri birleştir
+          git merge --no-ff origin/master -m "master değişiklikleri test branch'ine aktarıldı"
+
+          # sonucu remote test branch'ine gönder
+          git push origin test
