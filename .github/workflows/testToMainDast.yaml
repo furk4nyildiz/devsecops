@@ -43,14 +43,17 @@ jobs:
             sleep 5
           done
           echo "Uygulama zamanında ayağa kalkmadı."
+          docker logs app-under-test || true
           exit 1
 
       - name: OWASP ZAP Baseline DAST taraması
         uses: zaproxy/action-baseline@v0.15.0
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           target: 'http://localhost:3000'
-          fail_action: true
           cmd_options: '-a'
+          allow_issue_writing: false
+          fail_action: true
 
       - name: DAST sonrası container'ın durdurulması
         if: always()
@@ -60,17 +63,16 @@ jobs:
       - name: Test değişikliklerinin main branch'ine merge edilmesi
         if: success()
         run: |
+          TEST_BRANCH="${GITHUB_REF_NAME}"
+          MAIN_BRANCH="main"
+
           git fetch origin
 
-          if [ -d "main" ] || [ -f "main" ]; then
-            rm -rf main
-          fi
-
-          if git show-ref --quiet refs/remotes/origin/main; then
-            git checkout -B main origin/main
+          if git show-ref --quiet "refs/remotes/origin/${MAIN_BRANCH}"; then
+            git checkout -B "${MAIN_BRANCH}" "origin/${MAIN_BRANCH}"
           else
-            git checkout -B main
+            git checkout -B "${MAIN_BRANCH}"
           fi
 
-          git merge --no-ff origin/test -m "DAST sonrası test branch değişiklikleri main branch'ine aktarıldı"
-          git push origin main
+          git merge --no-ff "origin/${TEST_BRANCH}" -m "DAST sonrası ${TEST_BRANCH} değişiklikleri ${MAIN_BRANCH} branch'ine aktarıldı"
+          git push origin "${MAIN_BRANCH}"
